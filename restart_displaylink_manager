@@ -1,0 +1,38 @@
+#!/bin/sh
+
+#################################################
+#	restart_displaylink_manager		#
+#################################################
+# Sends a HUP signal to DisplayLink Manager,	#
+# and then restarts it.  This solves a lot of	#
+# problems using DisplayLink-based docking	#
+# stations with multiple monitors.		#
+# with multiple monitors.			#
+#################################################
+# Copyright (c)2023 Sridhar K.N. Ayengar	#
+# Available on the MIT License.			#
+# Please refer to the file LICENSE.		#
+#################################################
+
+kill=/bin/kill
+ps=/bin/ps
+sed=/usr/bin/sed
+uname=/usr/bin/uname
+
+case "$($uname)" in
+	Darwin)
+		EXECUTABLE='/Applications/DisplayLink Manager.app'
+		PROCESS_PATTERN='[D]isplayLink Manager\.app\/'
+		start=/usr/bin/open
+		;;
+	*)
+		echo "Unknown operating system." >&2
+		exit 255
+		;;
+esac
+
+PROCESS_ID="$($ps -ef | $sed	-e	"/${PROCESS_PATTERN}/!d" \
+				-Ee	's/^ +[0-9]+ +([0-9]*).*$/\1/')"
+
+$kill -HUP "${PROCESS_ID}" && $start "${EXECUTABLE}"
+exit $?
