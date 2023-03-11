@@ -1,0 +1,109 @@
+#!/bin/ksh
+
+#################################################
+#	send_file				#
+#################################################
+# Sends a file, Base64-encoded, as an attach-	#
+# ment by email, using the system sendmail	#
+# program.					#
+#################################################
+# Copyright (c)2023 Sridhar K.N. Ayengar	#
+# Available on the MIT License.			#
+# Please refer to the file LICENSE.		#
+#################################################
+
+base64=/usr/bin/base64
+basename=/usr/bin/basename
+hostname=/bin/hostname
+id=/usr/bin/id
+sendmail=/usr/sbin/sendmail
+
+usage() {
+	echo "Usage: $0 -f <file_name> -r <recipient_email>" 1>&2
+	exit 1
+}
+
+HOSTNAME=$($hostname -f)
+SEPARATOR=$(echo "${RANDOM}${RANDOM}${RANDOM}" | $base64)
+USERID=$($id -urn)
+USERNAME=$($id -F)
+SENDER="${USERNAME} <${USERID}@${HOSTNAME}>"
+
+if [ $# -ne 4 ] || [ "$1" = "$3" ]
+then
+	usage
+fi
+
+for parameter in 1 3
+do
+	case $(eval echo \$$parameter) in
+		"-f")
+			FILE_PATH=$(eval echo "\$$((parameter + 1))")
+			;;
+		"-r")
+			RECIPIENT=$(eval echo "\$$((parameter + 1))")
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+
+if [ ! -f "${FILE_PATH}" ]
+then
+	echo "Can only send a normal file." 1>&2
+	echo 1>&2
+	usage
+fi
+
+if [ ! -r "${FILE_PATH}" ]
+then
+	echo "Cannot read file." 1>&2
+	echo 1>&2
+	usage
+fi
+
+FILENAME=$($basename "${FILE_PATH}")
+
+case "${RECIPIENT}" in
+	"*@*@*")
+		echo "Invalid recipient address." 1>&2
+		echo 1>&2
+		usage
+		;;
+	"*@*")
+		:
+		;;
+	"*")
+		RECIPIENT="${RECIPIENT}@localhost"
+		;;
+esac
+
+$sendmail -t <<BLONG
+From: ${SENDER}
+To: ${RECIPIENT}
+Subject: File ${FILENAME} Sent from ${HOSTNAME}
+Content-Type: multipart/mixed; boundary=${SEPARATOR}
+
+This is a multipart message in MIME format.
+
+--${SEPARATOR}
+Content-Type: text/plain
+
+Hello.  This is a file sent by the user ${USERID} on host ${HOSTNAME}.
+
+Please, do not assume this file is safe.  Plesse check or scan it before
+opening.
+
+Thank you.
+
+--${SEPARATOR}
+
+Content-Type: ${MIMETYPE}
+Content-Transfer-Encoding: Base64
+Content-Disposition: attachment; filename=\"${FILENAME}\"
+
+$($base64 < "${FILE_PATH}")
+
+--${SEPARATOR}--
+BLONG
